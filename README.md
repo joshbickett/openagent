@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/npm/v/@bickett/openagent)](https://www.npmjs.com/package/@bickett/openagent)
 [![License](https://img.shields.io/github/license/joshbickett/openagent)](https://github.com/joshbickett/openagent/blob/main/LICENSE)
 
-![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
+<!-- ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png) -->
 
 OpenAgent is an open-source AI coding agent that brings powerful AI models directly into your terminal. A fork of Google's Gemini CLI, it provides access to all major coding AI models including Gemini, GPT-4, Claude, and more - combining the robust features of Gemini CLI with the flexibility to use any model you prefer.
 
@@ -295,6 +295,7 @@ Check our [Official Roadmap](https://github.com/orgs/google-gemini/projects/11/)
 - **[Official Roadmap](./ROADMAP.md)** - See what's coming next
 - **[NPM Package](https://www.npmjs.com/package/@bickett/openagent)** - Package registry
 - **[GitHub Issues](https://github.com/joshbickett/openagent/issues)** - Report bugs or request features
+- **[Security Advisories](https://github.com/google-gemini/gemini-cli/security/advisories)** - Security updates from upstream (Note: OpenAgent updates less frequently than Gemini CLI but will incorporate security updates regularly)
 
 ### Uninstall
 
