@@ -65,7 +65,7 @@ npm install -g @bickett/openagent@latest
 - New releases will be published each week at UTC 0000 each day, This will be all changes from the main branch as represented at time of release. It should be assumed there are pending validations and issues. Use `nightly` tag.
 
 ```bash
-npm install -g @google/gemini-cli@nightly
+npm install -g @bickett/openagent@nightly
 ```
 
 ## 📋 Key Features
@@ -86,15 +86,15 @@ npm install -g @google/gemini-cli@nightly
 
 - Ground your queries with built-in [Google Search](https://ai.google.dev/gemini-api/docs/grounding) for real-time information
 - Conversation checkpointing to save and resume complex sessions
-- Custom context files (GEMINI.md) to tailor behavior for your projects
+- Custom context files (OPENAGENT.md) to tailor behavior for your projects
 
 ### GitHub Integration
 
-Integrate Gemini CLI directly into your GitHub workflows with [**Gemini CLI GitHub Action**](https://github.com/google-github-actions/run-gemini-cli):
+Integrate OpenAgent directly into your GitHub workflows (using the original [**Gemini CLI GitHub Action**](https://github.com/google-github-actions/run-gemini-cli)):
 
 - **Pull Request Reviews**: Automated code review with contextual feedback and suggestions
 - **Issue Triage**: Automated labeling and prioritization of GitHub issues based on content analysis
-- **On-demand Assistance**: Mention `@gemini-cli` in issues and pull requests for help with debugging, explanations, or task delegation
+- **On-demand Assistance**: Mention `@openagent` in issues and pull requests for help with debugging, explanations, or task delegation
 - **Custom Workflows**: Build automated, scheduled and on-demand workflows tailored to your team's needs
 
 ## 🔐 Authentication Options
@@ -112,10 +112,10 @@ Choose the authentication method that best fits your needs:
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
 
-#### Start Gemini CLI, then choose _Login with Google_ and follow the browser authentication flow when prompted
+#### Start OpenAgent, then choose _Login with Google_ and follow the browser authentication flow when prompted
 
 ```bash
-gemini
+openagent
 ```
 
 #### If you are using a paid Code Assist License from your organization, remember to set the Google Cloud Project
@@ -123,7 +123,7 @@ gemini
 ```bash
 # Set your Google Cloud Project
 export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_NAME"
-gemini
+openagent
 ```
 
 ### Option 2: Gemini API Key
@@ -139,7 +139,7 @@ gemini
 ```bash
 # Get your key from https://aistudio.google.com/apikey
 export GEMINI_API_KEY="YOUR_API_KEY"
-gemini
+openagent
 ```
 
 ### Option 3: Vertex AI
@@ -156,7 +156,7 @@ gemini
 # Get your key from Google Cloud Console
 export GOOGLE_API_KEY="YOUR_API_KEY"
 export GOOGLE_GENAI_USE_VERTEXAI=true
-gemini
+openagent
 ```
 
 For Google Workspace accounts and other authentication methods, see the [authentication guide](./docs/cli/authentication.md).
@@ -168,19 +168,19 @@ For Google Workspace accounts and other authentication methods, see the [authent
 #### Start in current directory
 
 ```bash
-gemini
+openagent
 ```
 
 #### Include multiple directories
 
 ```bash
-gemini --include-directories ../lib,../docs
+openagent --include-directories ../lib,../docs
 ```
 
 #### Use specific model
 
 ```bash
-gemini -m gemini-2.5-flash
+openagent -m gemini-2.5-flash
 ```
 
 #### Non-interactive mode for scripts
@@ -188,14 +188,14 @@ gemini -m gemini-2.5-flash
 Get a simple text response:
 
 ```bash
-gemini -p "Explain the architecture of this codebase"
+openagent -p "Explain the architecture of this codebase"
 ```
 
 For more advanced scripting, including how to parse JSON and handle errors, use
 the `--output-format json` flag to get structured output:
 
 ```bash
-gemini -p "Explain the architecture of this codebase" --output-format json
+openagent -p "Explain the architecture of this codebase" --output-format json
 ```
 
 ### Quick Examples
@@ -204,16 +204,16 @@ gemini -p "Explain the architecture of this codebase" --output-format json
 
 ```bash
 cd new-project/
-gemini
+openagent
 > Write me a Discord bot that answers questions using a FAQ.md file I will provide
 ```
 
 #### Analyze existing code
 
 ```bash
-git clone https://github.com/google-gemini/gemini-cli
-cd gemini-cli
-gemini
+git clone https://github.com/joshbickett/openagent
+cd openagent
+openagent
 > Give me a summary of all of the changes that went in yesterday
 ```
 
@@ -230,7 +230,7 @@ gemini
 
 - [**Commands Reference**](./docs/cli/commands.md) - All slash commands (`/help`, `/chat`, `/mcp`, etc.)
 - [**Checkpointing**](./docs/checkpointing.md) - Save and resume conversations
-- [**Memory Management**](./docs/tools/memory.md) - Using GEMINI.md context files
+- [**Memory Management**](./docs/tools/memory.md) - Using OPENAGENT.md context files
 - [**Token Caching**](./docs/cli/token-caching.md) - Optimize token usage
 
 ### Tools & Extensions
@@ -245,7 +245,7 @@ gemini
 
 ### Advanced Topics
 
-- [**Architecture Overview**](./docs/architecture.md) - How Gemini CLI works
+- [**Architecture Overview**](./docs/architecture.md) - How OpenAgent works
 - [**IDE Integration**](./docs/ide-integration.md) - VS Code companion
 - [**Sandboxing & Security**](./docs/sandbox.md) - Safe execution environments
 - [**Enterprise Deployment**](./docs/deployment.md) - Docker, system-wide config
@@ -256,7 +256,7 @@ gemini
 
 - [**Settings Reference**](./docs/cli/configuration.md) - All configuration options
 - [**Theme Customization**](./docs/cli/themes.md) - Visual customization
-- [**.gemini Directory**](./docs/gemini-ignore.md) - Project-specific settings
+- [**.openagent Directory**](./docs/openagent-ignore.md) - Project-specific settings
 - [**Environment Variables**](./docs/cli/configuration.md#environment-variables)
 
 ### Troubleshooting & Support
@@ -267,7 +267,7 @@ gemini
 
 ### Using MCP Servers
 
-Configure MCP servers in `~/.gemini/settings.json` to extend Gemini CLI with custom tools:
+Configure MCP servers in `~/.openagent/settings.json` to extend OpenAgent with custom tools:
 
 ```text
 > @github List my open pull requests
@@ -279,7 +279,7 @@ See the [MCP Server Integration guide](./docs/tools/mcp-server.md) for setup ins
 
 ## 🤝 Contributing
 
-We welcome contributions! Gemini CLI is fully open source (Apache 2.0), and we encourage the community to:
+We welcome contributions! OpenAgent is fully open source (Apache 2.0), and we encourage the community to:
 
 - Report bugs and suggest features
 - Improve documentation
@@ -288,7 +288,7 @@ We welcome contributions! Gemini CLI is fully open source (Apache 2.0), and we e
 
 See our [Contributing Guide](./CONTRIBUTING.md) for development setup, coding standards, and how to submit pull requests.
 
-Check our [Official Roadmap](https://github.com/orgs/google-gemini/projects/11/) for planned features and priorities.
+Check the [Upstream Gemini CLI Roadmap](https://github.com/orgs/google-gemini/projects/11/) for reference.
 
 ## 📖 Resources
 
