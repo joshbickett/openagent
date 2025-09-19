@@ -1,15 +1,13 @@
-# Gemini CLI
+# OpenAgent
 
-[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
-[![Gemini CLI E2E](https://github.com/google-gemini/gemini-cli/actions/workflows/e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/e2e.yml)
-[![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)
-[![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
+[![Version](https://img.shields.io/npm/v/@bickett/openagent)](https://www.npmjs.com/package/@bickett/openagent)
+[![License](https://img.shields.io/github/license/joshbickett/openagent)](https://github.com/joshbickett/openagent/blob/main/LICENSE)
 
 ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
 
-Gemini CLI is an open-source AI agent that brings the power of Gemini directly into your terminal. It provides lightweight access to Gemini, giving you the most direct path from your prompt to our model.
+OpenAgent is an open-source AI agent that brings the power of Gemini directly into your terminal. A fork of Google's Gemini CLI, it provides lightweight access to Gemini models with the same powerful features.
 
-## 🚀 Why Gemini CLI?
+## 🚀 Why OpenAgent?
 
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google account
 - **🧠 Powerful Gemini 2.5 Pro**: Access to 1M token context window
@@ -26,20 +24,15 @@ Gemini CLI is an open-source AI agent that brings the power of Gemini directly i
 
 ```bash
 # Using npx (no installation required)
-npx https://github.com/google-gemini/gemini-cli
+npx @bickett/openagent
 ```
 
 #### Install globally with npm
 
 ```bash
-npm install -g @google/gemini-cli
+npm install -g @bickett/openagent
 ```
 
-#### Install globally with Homebrew (macOS/Linux)
-
-```bash
-brew install gemini-cli
-```
 
 #### System Requirements
 
@@ -55,7 +48,7 @@ See [Releases](./docs/releases.md) for more details.
 New preview releases will be published each week at UTC 2359 on Tuesdays. These releases will not have been fully vetted and may contain regressions or other outstanding issues. Please help us test and install with `preview` tag.
 
 ```bash
-npm install -g @google/gemini-cli@preview
+npm install -g @bickett/openagent@latest
 ```
 
 ### Stable
@@ -63,7 +56,7 @@ npm install -g @google/gemini-cli@preview
 - New stable releases will be published each week at UTC 2000 on Tuesdays, this will be the full promotion of last week's `preview` release + any bug fixes and validations. Use `latest` tag.
 
 ```bash
-npm install -g @google/gemini-cli@latest
+npm install -g @bickett/openagent@latest
 ```
 
 ### Nightly
@@ -299,9 +292,8 @@ Check our [Official Roadmap](https://github.com/orgs/google-gemini/projects/11/)
 ## 📖 Resources
 
 - **[Official Roadmap](./ROADMAP.md)** - See what's coming next
-- **[NPM Package](https://www.npmjs.com/package/@google/gemini-cli)** - Package registry
-- **[GitHub Issues](https://github.com/google-gemini/gemini-cli/issues)** - Report bugs or request features
-- **[Security Advisories](https://github.com/google-gemini/gemini-cli/security/advisories)** - Security updates
+- **[NPM Package](https://www.npmjs.com/package/@bickett/openagent)** - Package registry
+- **[GitHub Issues](https://github.com/joshbickett/openagent/issues)** - Report bugs or request features
 
 ### Uninstall
 
@@ -315,6 +307,11 @@ See the [Uninstall Guide](docs/Uninstall.md) for removal instructions.
 
 ---
 
+## 🙏 Credits
+
+OpenAgent is a fork of [Gemini CLI](https://github.com/google-gemini/gemini-cli) by Google. All credit for the original implementation goes to the Google team and contributors.
+
 <p align="center">
-  Built with ❤️ by Google and the open source community
+  Originally built with ❤️ by Google and the open source community<br>
+  Forked and maintained by <a href="https://github.com/joshbickett">Josh Bickett</a>
 </p>
