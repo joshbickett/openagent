@@ -56,7 +56,13 @@ function mapGeminiModelToOpenRouter(model: string): string {
  * Get appropriate max tokens for model
  * Improvement over hardcoded 20000
  */
-function getMaxTokensForModel(model: string): number {
+function getMaxTokensForModel(model: string): number | undefined {
+  // Some models work better without explicit max_tokens
+  // Grok models in particular seem to have issues with it
+  if (model.includes('grok')) {
+    return undefined; // Let the model use its default
+  }
+  
   // Conservative defaults for different model types
   if (model.includes('gemini-2.5')) return 8192;
   if (model.includes('gemini-pro')) return 8192;
@@ -88,35 +94,73 @@ export function createOpenRouterContentGenerator(
       const modelName = mapGeminiModelToOpenRouter(request.model || DEFAULT_GEMINI_MODEL);
       const maxTokens = request.config?.maxOutputTokens || getMaxTokensForModel(modelName);
 
-      const stream = await openRouterClient.chat.completions.create({
+      // Enhanced logging for debugging
+      const streamParams: any = {
         model: modelName,
         messages: systemInstruction
           ? [{ role: 'system', content: systemInstruction }, ...messages]
           : messages,
-        temperature: request.config?.temperature,
-        top_p: request.config?.topP,
-        max_tokens: maxTokens,
-        tools: convertTools(request.config?.tools),
         stream: true,
-        stream_options: { include_usage: true },
-      });
+      };
+      
+      // Only add optional parameters if they're defined
+      if (request.config?.temperature !== undefined) {
+        streamParams.temperature = request.config.temperature;
+      }
+      if (request.config?.topP !== undefined) {
+        streamParams.top_p = request.config.topP;
+      }
+      if (maxTokens !== undefined) {
+        streamParams.max_tokens = maxTokens;
+      }
+      const tools = convertTools(request.config?.tools);
+      if (tools !== undefined) {
+        streamParams.tools = tools;
+      }
+
+      if (process.env['DEBUG_OPENROUTER']) {
+        console.error('OpenRouter stream request params:', JSON.stringify(streamParams, null, 2));
+        console.error('Original request contents:', JSON.stringify(request.contents, null, 2));
+      }
+
+      const stream = await openRouterClient.chat.completions.create(streamParams as OpenAI.Chat.ChatCompletionCreateParamsStreaming);
 
       let hasContent = false;
+      let hasFinishReason = false;
+      
       for await (const chunk of stream) {
         const response = convertChunkToGeminiResponse(chunk);
         if (response.candidates && response.candidates.length > 0) {
-          hasContent = true;
-          yield response;
+          const candidate = response.candidates[0];
+          // Check if we have actual content or finish reason
+          const hasText = candidate?.content?.parts?.some((part: Part) => 'text' in part && part.text);
+          const hasToolCall = candidate?.content?.parts?.some((part: Part) => 'functionCall' in part);
+          
+          if (hasText || hasToolCall) {
+            hasContent = true;
+          }
+          
+          if (candidate?.finishReason) {
+            hasFinishReason = true;
+          }
+          
+          // Only yield if we have meaningful content
+          if (hasText || hasToolCall || candidate?.finishReason) {
+            yield response;
+          }
         }
       }
       
-      // If we never got any content, yield an empty response with finish reason
-      if (!hasContent) {
+      // Ensure we always have a finish reason
+      if (!hasFinishReason) {
+        if (process.env['DEBUG_OPENROUTER']) {
+          console.error('No finish reason received from model');
+        }
         yield {
           candidates: [{
             content: {
               role: 'model',
-              parts: [{ text: '' }],
+              parts: hasContent ? [] : [{ text: '' }],
             },
             index: 0,
             finishReason: FinishReason.STOP,
@@ -124,6 +168,16 @@ export function createOpenRouterContentGenerator(
         } as unknown as GenerateContentResponse;
       }
     } catch (error) {
+      if (process.env['DEBUG_OPENROUTER']) {
+        console.error('OpenRouter stream error:', error);
+        if (error instanceof OpenAI.APIError) {
+          console.error('OpenRouter API error details:', {
+            status: error.status,
+            message: error.message,
+            error: error,
+          });
+        }
+      }
       throw convertError(error);
     }
   }
@@ -139,26 +193,54 @@ export function createOpenRouterContentGenerator(
         const modelName = mapGeminiModelToOpenRouter(request.model || DEFAULT_GEMINI_MODEL);
         const maxTokens = request.config?.maxOutputTokens || getMaxTokensForModel(modelName);
 
-        const completion = await openRouterClient.chat.completions.create({
+        // Enhanced logging for debugging
+        const completionParams: any = {
           model: modelName,
           messages: systemInstruction
             ? [{ role: 'system', content: systemInstruction }, ...messages]
             : messages,
-          temperature: request.config?.temperature,
-          top_p: request.config?.topP,
-          max_tokens: maxTokens,
-          tools: convertTools(request.config?.tools),
-          response_format:
-            request.config?.responseMimeType === 'application/json'
-              ? { type: 'json_object' }
-              : undefined,
           stream: false,
-        });
+        };
+        
+        // Only add optional parameters if they're defined
+        if (request.config?.temperature !== undefined) {
+          completionParams.temperature = request.config.temperature;
+        }
+        if (request.config?.topP !== undefined) {
+          completionParams.top_p = request.config.topP;
+        }
+        if (maxTokens !== undefined) {
+          completionParams.max_tokens = maxTokens;
+        }
+        const tools = convertTools(request.config?.tools);
+        if (tools !== undefined) {
+          completionParams.tools = tools;
+        }
+        if (request.config?.responseMimeType === 'application/json') {
+          completionParams.response_format = { type: 'json_object' };
+        }
+
+        if (process.env['DEBUG_OPENROUTER']) {
+          console.error('OpenRouter non-stream request params:', JSON.stringify(completionParams, null, 2));
+          console.error('Original request contents:', JSON.stringify(request.contents, null, 2));
+        }
+
+        const completion = await openRouterClient.chat.completions.create(completionParams as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming);
 
         return convertToGeminiResponse(
           completion as OpenAI.Chat.ChatCompletion,
         );
       } catch (error) {
+        if (process.env['DEBUG_OPENROUTER']) {
+          console.error('OpenRouter non-stream error:', error);
+          if (error instanceof OpenAI.APIError) {
+            console.error('OpenRouter API error details:', {
+              status: error.status,
+              message: error.message,
+              error: error,
+            });
+          }
+        }
         throw convertError(error);
       }
     },
@@ -264,6 +346,7 @@ function convertToOpenAIFormat(
   const contents = normalizeContents(request.contents);
 
   return contents
+    .filter((content) => content && typeof content === 'object') // Filter out any malformed content
     .map((content: Content) => {
       const role =
         content.role === 'model' ? 'assistant' : (content.role as string);
@@ -328,7 +411,7 @@ function convertToOpenAIFormat(
       return {
         role: (role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
         content: text,
-      };
+      } as OpenAI.Chat.ChatCompletionMessageParam;
     })
     .flat();
 }
@@ -408,7 +491,7 @@ function convertChunkToGeminiResponse(
     finishReason: mapFinishReason(choice.finish_reason),
   };
 
-  // Only return a response if we have content or a finish reason
+  // Only return a candidate if we have content or a finish reason
   if (parts.length === 0 && !choice.finish_reason) {
     return {
       candidates: [],
@@ -500,9 +583,14 @@ function mapFinishReason(reason: string | null): FinishReason | undefined {
 
 function convertError(error: any): Error {
   if (error instanceof OpenAI.APIError) {
-    return new Error(
-      `OpenRouter API error (${error.status}): ${error.message}`,
-    );
+    let errorMessage = `OpenRouter API error (${error.status}): ${error.message}`;
+    
+    // Add specific guidance for common errors
+    if (error.status === 422) {
+      errorMessage += '\nThis usually indicates the model doesn\'t support one of the parameters sent (e.g., tools, stream_options, or specific max_tokens values).';
+    }
+    
+    return new Error(errorMessage);
   }
   return error instanceof Error ? error : new Error(String(error));
 }
