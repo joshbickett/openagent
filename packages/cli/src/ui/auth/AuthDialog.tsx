@@ -54,6 +54,7 @@ export function AuthDialog({
       value: AuthType.USE_GEMINI,
     },
     { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    { label: 'OpenRouter', value: AuthType.USE_OPENROUTER },
   ];
 
   if (settings.merged.security?.auth?.enforcedType) {
@@ -82,6 +83,10 @@ export function AuthDialog({
 
     if (process.env['GEMINI_API_KEY']) {
       return item.value === AuthType.USE_GEMINI;
+    }
+
+    if (process.env['OPENROUTER_API_KEY']) {
+      return item.value === AuthType.USE_OPENROUTER;
     }
 
     return item.value === AuthType.LOGIN_WITH_GOOGLE;

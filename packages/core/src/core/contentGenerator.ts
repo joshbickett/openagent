@@ -46,6 +46,7 @@ export enum AuthType {
   USE_GEMINI = 'gemini-api-key',
   USE_VERTEX_AI = 'vertex-ai',
   CLOUD_SHELL = 'cloud-shell',
+  USE_OPENROUTER = 'openrouter-api-key',
 }
 
 export type ContentGeneratorConfig = {
@@ -91,6 +92,14 @@ export function createContentGeneratorConfig(
     contentGeneratorConfig.apiKey = googleApiKey;
     contentGeneratorConfig.vertexai = true;
 
+    return contentGeneratorConfig;
+  }
+
+  if (authType === AuthType.USE_OPENROUTER) {
+    const openRouterApiKey = process.env['OPENROUTER_API_KEY'];
+    if (openRouterApiKey) {
+      contentGeneratorConfig.apiKey = openRouterApiKey;
+    }
     return contentGeneratorConfig;
   }
 
@@ -146,6 +155,18 @@ export async function createContentGenerator(
     });
     return new LoggingContentGenerator(googleGenAI.models, gcConfig);
   }
+
+  if (config.authType === AuthType.USE_OPENROUTER) {
+    const { createOpenRouterContentGenerator } = await import(
+      './openRouterContentGenerator.js'
+    );
+    const httpOptions = { headers: baseHeaders };
+    return new LoggingContentGenerator(
+      createOpenRouterContentGenerator(config, httpOptions),
+      gcConfig,
+    );
+  }
+
   throw new Error(
     `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
   );

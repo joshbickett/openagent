@@ -159,6 +159,25 @@ export GOOGLE_GENAI_USE_VERTEXAI=true
 openagent
 ```
 
+### Option 4: OpenRouter
+
+**✨ Best for:** Developers who want access to multiple AI models beyond Gemini
+
+**Benefits:**
+
+- **Multi-model access**: Use Gemini, Claude, GPT-4, Llama, and many more models
+- **Unified API**: Single API key for all models
+- **Flexible routing**: Automatically route to available providers
+- **Usage-based billing**: Pay only for what you use across all models
+
+```bash
+# Get your key from https://openrouter.ai
+export OPENROUTER_API_KEY="YOUR_API_KEY"
+openagent
+```
+
+For more details on OpenRouter support, see the [OpenRouter guide](./docs/openrouter.md).
+
 For Google Workspace accounts and other authentication methods, see the [authentication guide](./docs/cli/authentication.md).
 
 ## 🚀 Getting Started
