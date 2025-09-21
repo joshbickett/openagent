@@ -11,18 +11,13 @@ import { theme } from '../semantic-colors.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
-import {
-  AuthType,
-  clearCachedCredentialFile,
-  type Config,
-} from '@google/gemini-cli-core';
+import { AuthType, clearCachedCredentialFile } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { AuthState } from '../types.js';
 // import { runExitCleanup } from '../../utils/cleanup.js'; // Commented for OpenAgent fork
 import { validateAuthMethodWithSettings } from './useAuth.js';
 
 interface AuthDialogProps {
-  config: Config;
   settings: LoadedSettings;
   setAuthState: (state: AuthState) => void;
   authError: string | null;
@@ -30,7 +25,6 @@ interface AuthDialogProps {
 }
 
 export function AuthDialog({
-  config,
   settings,
   setAuthState,
   authError,
@@ -85,12 +79,12 @@ export function AuthDialog({
     // For OpenAgent, always default to OpenRouter
     return item.value === AuthType.USE_OPENROUTER;
   });
-  
+
   // Ensure initialAuthIndex is valid (not -1)
   if (initialAuthIndex === -1) {
     initialAuthIndex = 0;
   }
-  
+
   if (settings.merged.security?.auth?.enforcedType) {
     initialAuthIndex = 0;
   }
@@ -119,7 +113,7 @@ export function AuthDialog({
       }
       setAuthState(AuthState.Unauthenticated);
     },
-    [settings, config, setAuthState],
+    [settings, setAuthState],
   );
 
   const handleAuthSelect = (authMethod: AuthType) => {
@@ -191,7 +185,7 @@ export function AuthDialog({
       <Box marginTop={1}>
         <Text color={theme.text.link}>
           {
-            'https://github.com/bickett/openagent/blob/main/docs/tos-privacy.md'
+            'https://github.com/joshbickett/openagent/blob/main/docs/tos-privacy.md'
           }
         </Text>
       </Box>

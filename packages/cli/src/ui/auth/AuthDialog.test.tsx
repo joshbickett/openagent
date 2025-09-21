@@ -82,9 +82,6 @@ describe('AuthDialog', () => {
     process.env = {};
 
     props = {
-      config: {
-        isBrowserLaunchSuppressed: vi.fn().mockReturnValue(false),
-      } as unknown as Config,
       settings: {
         merged: {
           security: {
