@@ -98,6 +98,16 @@ export function createOpenRouterContentGenerator(
       const maxTokens =
         request.config?.maxOutputTokens || getMaxTokensForModel(modelName);
 
+      // State for accumulating streaming tool calls
+      const toolCallAccumulator: Map<
+        number,
+        {
+          id?: string;
+          name?: string;
+          arguments: string;
+        }
+      > = new Map();
+
       // Enhanced logging for debugging
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const streamParams: any = {
@@ -126,7 +136,7 @@ export function createOpenRouterContentGenerator(
       }
 
       // Enhanced debug logging
-      if (process.env['DEBUG_OPENROUTER']) {
+      if (process.env['DEBUG_OPENROUTER'] || modelName.includes('gpt-5')) {
         console.error('=== OpenRouter Debug Info ===');
         console.error('Model:', modelName);
         console.error(
@@ -137,6 +147,12 @@ export function createOpenRouterContentGenerator(
           'Original request contents:',
           JSON.stringify(request.contents, null, 2),
         );
+        if (streamParams.tools) {
+          console.error(
+            'Tools provided:',
+            JSON.stringify(streamParams.tools, null, 2),
+          );
+        }
         console.error('=============================');
       }
 
@@ -148,7 +164,10 @@ export function createOpenRouterContentGenerator(
       let hasFinishReason = false;
 
       for await (const chunk of stream) {
-        const response = convertChunkToGeminiResponse(chunk);
+        const response = convertChunkToGeminiResponse(
+          chunk,
+          toolCallAccumulator,
+        );
         if (response.candidates && response.candidates.length > 0) {
           const candidate = response.candidates[0];
           // Check if we have actual content or finish reason
@@ -171,6 +190,44 @@ export function createOpenRouterContentGenerator(
           if (hasText || hasToolCall || candidate?.finishReason) {
             yield response;
           }
+        }
+      }
+
+      // Emit any remaining completed tool calls
+      const remainingToolCalls = Array.from(
+        toolCallAccumulator.values(),
+      ).filter((tc) => tc.id && tc.name && tc.arguments);
+
+      if (remainingToolCalls.length > 0) {
+        const parts: Part[] = [];
+        for (const toolCall of remainingToolCalls) {
+          try {
+            const args = JSON.parse(toolCall.arguments);
+            parts.push({
+              functionCall: {
+                id: toolCall.id,
+                name: toolCall.name!,
+                args,
+              },
+            });
+            hasContent = true;
+          } catch {
+            // Skip malformed tool calls
+          }
+        }
+
+        if (parts.length > 0) {
+          yield {
+            candidates: [
+              {
+                content: {
+                  role: 'model',
+                  parts,
+                },
+                index: 0,
+              },
+            ],
+          } as unknown as GenerateContentResponse;
         }
       }
 
@@ -450,7 +507,7 @@ function convertToOpenAIFormat(
       if (functionResponses.length > 0) {
         return functionResponses.map((part: Part, index: number) => ({
           role: 'tool' as const,
-          tool_call_id: part.functionResponse?.name || `call_${index}`,
+          tool_call_id: part.functionResponse?.id || `call_${index}`,
           content: JSON.stringify(part.functionResponse?.response || {}),
         }));
       }
@@ -490,22 +547,29 @@ function convertTools(
 
   return functionDeclarations.map((func) => {
     // Ensure parameters has valid JSON Schema structure
-    const parameters = func.parameters || {};
+    // Gemini uses parametersJsonSchema, not parameters
+    const parameters = func.parametersJsonSchema || func.parameters || {};
 
-    // Convert to plain JSON Schema format for OpenRouter
-    // The Gemini SDK uses Type enum, but OpenRouter expects standard JSON Schema
+    // The parametersJsonSchema from Gemini tools is already a valid JSON Schema
+    // Just use it directly, ensuring it has the required structure
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const jsonSchemaParams: any = {
-      type: 'object',
-      properties: parameters.properties || {},
-    };
+    let jsonSchemaParams: any = parameters;
 
-    if (parameters.required) {
-      jsonSchemaParams.required = parameters.required;
+    // If it doesn't have a type property, wrap it properly
+    if (!jsonSchemaParams.type) {
+      jsonSchemaParams = {
+        type: 'object',
+        properties: jsonSchemaParams.properties || jsonSchemaParams || {},
+        required: jsonSchemaParams.required,
+      };
     }
 
     // Debug logging for problematic tools
-    if (process.env['DEBUG_OPENROUTER']) {
+    if (process.env['DEBUG_OPENROUTER'] || func.name === 'read_file') {
+      console.error(
+        `Tool ${func.name} original function declaration:`,
+        JSON.stringify(func, null, 2),
+      );
       console.error(
         `${func.name} parameters:`,
         JSON.stringify(func.parameters, null, 2),
@@ -529,6 +593,14 @@ function convertTools(
 
 function convertChunkToGeminiResponse(
   chunk: OpenAI.Chat.Completions.ChatCompletionChunk,
+  toolCallAccumulator?: Map<
+    number,
+    {
+      id?: string;
+      name?: string;
+      arguments: string;
+    }
+  >,
 ): GenerateContentResponse {
   const choice = chunk.choices?.[0];
   if (!choice) {
@@ -544,16 +616,69 @@ function convertChunkToGeminiResponse(
     parts.push({ text: delta.content });
   }
 
-  if (delta?.tool_calls) {
+  if (delta?.tool_calls && toolCallAccumulator) {
+    for (const toolCall of delta.tool_calls) {
+      const index = toolCall.index;
+      if (index === undefined) continue;
+
+      // Get or create accumulator for this index
+      let accumulator = toolCallAccumulator.get(index);
+      if (!accumulator) {
+        accumulator = { arguments: '' };
+        toolCallAccumulator.set(index, accumulator);
+      }
+
+      // Accumulate the tool call data
+      if (toolCall.id) {
+        accumulator.id = toolCall.id;
+      }
+      if (toolCall.function?.name) {
+        accumulator.name = toolCall.function.name;
+      }
+      if (toolCall.function?.arguments) {
+        accumulator.arguments += toolCall.function.arguments;
+      }
+
+      // Try to parse if we have all required fields
+      if (accumulator.id && accumulator.name && accumulator.arguments) {
+        try {
+          const args = JSON.parse(accumulator.arguments);
+          parts.push({
+            functionCall: {
+              id: accumulator.id,
+              name: accumulator.name,
+              args,
+            },
+          });
+          // Clear the accumulator after successful parse
+          toolCallAccumulator.delete(index);
+        } catch (e) {
+          // Arguments not yet complete, keep accumulating
+          if (process.env['DEBUG_OPENROUTER']) {
+            console.error(
+              `Tool call accumulation - parse failed for index ${index}:`,
+              {
+                id: accumulator.id,
+                name: accumulator.name,
+                arguments: accumulator.arguments,
+                error: e,
+              },
+            );
+          }
+        }
+      }
+    }
+  } else if (delta?.tool_calls) {
+    // Fallback for non-streaming or when accumulator not provided
     for (const toolCall of delta.tool_calls) {
       if (toolCall.function?.name) {
-        // Only include complete function calls
         try {
           const args = toolCall.function.arguments
             ? JSON.parse(toolCall.function.arguments)
             : {};
           parts.push({
             functionCall: {
+              id: toolCall.id,
               name: toolCall.function.name,
               args,
             },
@@ -615,6 +740,7 @@ function convertToGeminiResponse(
     for (const toolCall of choice.message.tool_calls) {
       parts.push({
         functionCall: {
+          id: toolCall.id,
           name: toolCall.function.name,
           args: JSON.parse(toolCall.function.arguments),
         },
