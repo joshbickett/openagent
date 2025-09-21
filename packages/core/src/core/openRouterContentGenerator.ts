@@ -125,8 +125,8 @@ export function createOpenRouterContentGenerator(
         streamParams.tools = tools;
       }
 
-      // Enhanced debug logging for GPT-5
-      if (process.env['DEBUG_OPENROUTER'] || modelName.includes('gpt-5')) {
+      // Enhanced debug logging
+      if (process.env['DEBUG_OPENROUTER']) {
         console.error('=== OpenRouter Debug Info ===');
         console.error('Model:', modelName);
         console.error(
@@ -258,8 +258,8 @@ export function createOpenRouterContentGenerator(
           completionParams.response_format = { type: 'json_object' };
         }
 
-        // Enhanced debug logging for GPT-5
-        if (process.env['DEBUG_OPENROUTER'] || modelName.includes('gpt-5')) {
+        // Enhanced debug logging
+        if (process.env['DEBUG_OPENROUTER']) {
           console.error('=== OpenRouter Debug Info (non-stream) ===');
           console.error('Model:', modelName);
           console.error(
@@ -473,7 +473,7 @@ import type { ToolListUnion, Tool as GenaiTool } from '@google/genai';
 
 function convertTools(
   tools?: ToolListUnion,
-  modelName?: string,
+  _modelName?: string,
 ): OpenAI.Chat.ChatCompletionTool[] | undefined {
   if (!tools) return undefined;
 
@@ -505,10 +505,7 @@ function convertTools(
     }
 
     // Debug logging for problematic tools
-    if (
-      (func.name === 'list_directory' || process.env['DEBUG_OPENROUTER']) &&
-      modelName?.includes('gpt-5')
-    ) {
+    if (process.env['DEBUG_OPENROUTER']) {
       console.error(
         `${func.name} parameters:`,
         JSON.stringify(func.parameters, null, 2),
