@@ -1,0 +1,103 @@
+name: 'Publish Release Simple'
+description: 'Builds and publishes the openagent package to npm and creates a GitHub release.'
+
+inputs:
+  release-version:
+    description: 'The version to release (e.g., 0.1.11).'
+    required: true
+  npm-tag:
+    description: 'The npm tag to publish with (e.g., latest, preview, nightly).'
+    required: true
+  npm-token:
+    description: 'The npm token for publishing to npm registry.'
+    required: true
+  github-token:
+    description: 'The GitHub token for creating the release.'
+    required: true
+  dry-run:
+    description: 'Whether to run in dry-run mode.'
+    type: 'string'
+    required: true
+  release-tag:
+    description: 'The release tag for the release (e.g., v0.1.11).'
+    required: true
+  previous-tag:
+    description: 'The previous tag to use for generating release notes.'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: '📝 Print Inputs'
+      shell: 'bash'
+      run: |
+        echo "Release version: ${{ inputs.release-version }}"
+        echo "NPM tag: ${{ inputs.npm-tag }}"
+        echo "Release tag: ${{ inputs.release-tag }}"
+        echo "Dry run: ${{ inputs.dry-run }}"
+
+    - name: '👤 Configure Git User'
+      shell: 'bash'
+      run: |
+        git config user.name "openagent-bot"
+        git config user.email "openagent-bot@users.noreply.github.com"
+
+    - name: '⬆️ Update package version'
+      shell: 'bash'
+      run: |
+        npm version "${{ inputs.release-version }}" --no-git-tag-version
+
+    - name: '💾 Commit version bump'
+      shell: 'bash'
+      env:
+        DRY_RUN: '${{ inputs.dry-run }}'
+        RELEASE_TAG: '${{ inputs.release-tag }}'
+      run: |-
+        git add package.json package-lock.json
+        git commit -m "chore(release): ${RELEASE_TAG}" || echo "No changes to commit"
+        
+        if [[ "${DRY_RUN}" == "false" ]]; then
+          echo "Creating and pushing tag..."
+          git tag "${RELEASE_TAG}"
+          git push origin main --tags
+        else
+          echo "Dry run enabled. Skipping push."
+        fi
+
+    - name: '🏗️ Build Package'
+      shell: 'bash'
+      run: |
+        npm run build
+        npm run bundle
+
+    - name: 'Configure npm for publishing'
+      uses: 'actions/setup-node@v4'
+      with:
+        node-version-file: '.nvmrc'
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: '📦 Publish to npm'
+      env:
+        NODE_AUTH_TOKEN: '${{ inputs.npm-token }}'
+      shell: 'bash'
+      run: |
+        if [[ "${{ inputs.dry-run }}" == "false" ]]; then
+          npm publish --access=public --tag="${{ inputs.npm-tag }}"
+        else
+          npm publish --dry-run --access=public --tag="${{ inputs.npm-tag }}"
+        fi
+
+    - name: '🎉 Create GitHub Release'
+      if: "${{ inputs.dry-run == 'false' }}"
+      env:
+        GITHUB_TOKEN: '${{ inputs.github-token }}'
+      shell: 'bash'
+      run: |
+        # Wait a moment for the tag to be available
+        sleep 2
+        
+        gh release create "${{ inputs.release-tag }}" \
+          bundle/gemini.js \
+          --title "Release ${{ inputs.release-tag }}" \
+          --notes-start-tag "${{ inputs.previous-tag }}" \
+          --generate-notes

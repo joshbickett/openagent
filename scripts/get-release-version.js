@@ -30,7 +30,7 @@ function getLatestTag(pattern) {
 }
 
 function getVersionFromNPM(distTag) {
-  const command = `npm view @google/gemini-cli version --tag=${distTag}`;
+  const command = `npm view @bickett/openagent version --tag=${distTag}`;
   try {
     return execSync(command).toString().trim();
   } catch {

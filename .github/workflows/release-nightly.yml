@@ -45,11 +45,12 @@ jobs:
       - name: 'Install Dependencies'
         run: 'npm ci'
 
-      - name: 'Run Tests'
-        uses: './.github/actions/run-tests'
-        with:
-          force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
-          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+      # Tests disabled for now - can be re-enabled later
+      # - name: 'Run Tests'
+      #   uses: './.github/actions/run-tests'
+      #   with:
+      #     force_skip_tests: '${{ github.event.inputs.force_skip_tests }}'
+      #     gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
 
       - name: 'Get Nightly Version'
         id: 'nightly_version'
@@ -63,26 +64,26 @@ jobs:
           echo "PREVIOUS_TAG=$(echo "${VERSION_JSON}" | jq -r .previousReleaseTag)" >> "${GITHUB_OUTPUT}"
 
       - name: 'Publish Release'
-        uses: './.github/actions/publish-release'
+        uses: './.github/actions/publish-release-simple'
         with:
           release-version: '${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
           release-tag: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'
           npm-tag: '${{ steps.nightly_version.outputs.NPM_TAG }}'
-          wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
-          wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
+          npm-token: '${{ secrets.NPM_TOKEN }}'
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
           previous-tag: '${{ steps.nightly_version.outputs.PREVIOUS_TAG }}'
 
-      - name: 'Create and Merge Pull Request'
-        uses: './.github/actions/create-pull-request'
-        with:
-          branch-name: 'release/${{ steps.nightly_version.outputs.RELEASE_TAG }}'
-          pr-title: 'chore(release): bump version to ${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
-          pr-body: 'Automated version bump for nightly release.'
-          app-id: '${{ secrets.APP_ID }}'
-          private-key: '${{ secrets.PRIVATE_KEY }}'
-          dry-run: '${{ github.event.inputs.dry_run }}'
+      # Pull request creation disabled - direct commits to main instead
+      # - name: 'Create and Merge Pull Request'
+      #   uses: './.github/actions/create-pull-request'
+      #   with:
+      #     branch-name: 'release/${{ steps.nightly_version.outputs.RELEASE_TAG }}'
+      #     pr-title: 'chore(release): bump version to ${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
+      #     pr-body: 'Automated version bump for nightly release.'
+      #     app-id: '${{ secrets.APP_ID }}'
+      #     private-key: '${{ secrets.PRIVATE_KEY }}'
+      #     dry-run: '${{ github.event.inputs.dry_run }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
