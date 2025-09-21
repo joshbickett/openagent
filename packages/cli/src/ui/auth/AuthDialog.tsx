@@ -18,7 +18,7 @@ import {
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { AuthState } from '../types.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
+// import { runExitCleanup } from '../../utils/cleanup.js'; // Commented for OpenAgent fork
 import { validateAuthMethodWithSettings } from './useAuth.js';
 
 interface AuthDialogProps {
@@ -37,23 +37,24 @@ export function AuthDialog({
   onAuthError,
 }: AuthDialogProps): React.JSX.Element {
   let items = [
-    {
-      label: 'Login with Google',
-      value: AuthType.LOGIN_WITH_GOOGLE,
-    },
-    ...(process.env['CLOUD_SHELL'] === 'true'
-      ? [
-          {
-            label: 'Use Cloud Shell user credentials',
-            value: AuthType.CLOUD_SHELL,
-          },
-        ]
-      : []),
-    {
-      label: 'Use Gemini API Key',
-      value: AuthType.USE_GEMINI,
-    },
-    { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
+    // Commented out Google login options for OpenAgent fork
+    // {
+    //   label: 'Login with Google',
+    //   value: AuthType.LOGIN_WITH_GOOGLE,
+    // },
+    // ...(process.env['CLOUD_SHELL'] === 'true'
+    //   ? [
+    //       {
+    //         label: 'Use Cloud Shell user credentials',
+    //         value: AuthType.CLOUD_SHELL,
+    //       },
+    //     ]
+    //   : []),
+    // {
+    //   label: 'Use Gemini API Key',
+    //   value: AuthType.USE_GEMINI,
+    // },
+    // { label: 'Vertex AI', value: AuthType.USE_VERTEX_AI },
     { label: 'OpenRouter', value: AuthType.USE_OPENROUTER },
   ];
 
@@ -81,16 +82,15 @@ export function AuthDialog({
       return item.value === defaultAuthType;
     }
 
-    if (process.env['GEMINI_API_KEY']) {
-      return item.value === AuthType.USE_GEMINI;
-    }
-
-    if (process.env['OPENROUTER_API_KEY']) {
-      return item.value === AuthType.USE_OPENROUTER;
-    }
-
-    return item.value === AuthType.LOGIN_WITH_GOOGLE;
+    // For OpenAgent, always default to OpenRouter
+    return item.value === AuthType.USE_OPENROUTER;
   });
+  
+  // Ensure initialAuthIndex is valid (not -1)
+  if (initialAuthIndex === -1) {
+    initialAuthIndex = 0;
+  }
+  
   if (settings.merged.security?.auth?.enforcedType) {
     initialAuthIndex = 0;
   }
@@ -101,20 +101,21 @@ export function AuthDialog({
         await clearCachedCredentialFile();
 
         settings.setValue(scope, 'security.auth.selectedType', authType);
-        if (
-          authType === AuthType.LOGIN_WITH_GOOGLE &&
-          config.isBrowserLaunchSuppressed()
-        ) {
-          runExitCleanup();
-          console.log(
-            `
-----------------------------------------------------------------
-Logging in with Google... Please restart Gemini CLI to continue.
-----------------------------------------------------------------
-            `,
-          );
-          process.exit(0);
-        }
+        // Commented out Google login handling for OpenAgent fork
+        // if (
+        //   authType === AuthType.LOGIN_WITH_GOOGLE &&
+        //   config.isBrowserLaunchSuppressed()
+        // ) {
+        //   runExitCleanup();
+        //   console.log(
+        //     `
+        // ----------------------------------------------------------------
+        // Logging in with Google... Please restart Gemini CLI to continue.
+        // ----------------------------------------------------------------
+        //             `,
+        //   );
+        //   process.exit(0);
+        // }
       }
       setAuthState(AuthState.Unauthenticated);
     },
@@ -184,13 +185,13 @@ Logging in with Google... Please restart Gemini CLI to continue.
       </Box>
       <Box marginTop={1}>
         <Text color={theme.text.primary}>
-          Terms of Services and Privacy Notice for Gemini CLI
+          Terms of Services and Privacy Notice
         </Text>
       </Box>
       <Box marginTop={1}>
         <Text color={theme.text.link}>
           {
-            'https://github.com/google-gemini/gemini-cli/blob/main/docs/tos-privacy.md'
+            'https://github.com/bickett/openagent/blob/main/docs/tos-privacy.md'
           }
         </Text>
       </Box>
