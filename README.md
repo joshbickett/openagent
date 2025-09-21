@@ -5,11 +5,11 @@
 
 <!-- ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png) -->
 
-OpenAgent is an open-source AI coding agent that brings powerful AI models directly into your terminal. A fork of Google's Gemini CLI, it provides access to all major coding AI models including Gemini, GPT-4, Claude, and more - combining the robust features of Gemini CLI with the flexibility to use any model you prefer.
+OpenAgent is an open-source AI coding agent that brings powerful AI models directly into your terminal. A fork of Google's Gemini CLI, it provides access to all major coding AI models from x-ai, anthropic, qwen, google, openai, more - combining the robust features of Gemini CLI with the flexibility to use any model you prefer.
 
 ## 🚀 Why OpenAgent?
 
-- **🤖 Multi-model support**: Use Gemini, GPT-4, Claude, and other coding AI models
+- **🤖 Multi-model support**: Use Gemini, GPT, Claude, and other coding AI models
 - **🎯 Free tier**: 60 requests/min and 1,000 requests/day with Gemini (via Google account)
 - **🧠 Powerful models**: Access Gemini 2.5 Pro (1M context), GPT-4, Claude 3.5, and more
 - **🔧 Built-in tools**: Google Search grounding, file operations, shell commands, web fetching
