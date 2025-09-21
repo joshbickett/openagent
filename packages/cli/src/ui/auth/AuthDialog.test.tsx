@@ -15,15 +15,13 @@ import {
   type Mock,
 } from 'vitest';
 import { AuthDialog } from './AuthDialog.js';
-import { AuthType, type Config } from '@google/gemini-cli-core';
+import { AuthType , clearCachedCredentialFile } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import { SettingScope } from '../../config/settings.js';
 import { AuthState } from '../types.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { validateAuthMethodWithSettings } from './useAuth.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
-import { clearCachedCredentialFile } from '@google/gemini-cli-core';
 import { Text } from 'ink';
 
 // Mocks
@@ -35,10 +33,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     clearCachedCredentialFile: vi.fn(),
   };
 });
-
-vi.mock('../../utils/cleanup.js', () => ({
-  runExitCleanup: vi.fn(),
-}));
 
 vi.mock('./useAuth.js', () => ({
   validateAuthMethodWithSettings: vi.fn(),
@@ -64,12 +58,10 @@ vi.mock('../components/shared/RadioButtonSelect.js', () => ({
 const mockedUseKeypress = useKeypress as Mock;
 const mockedRadioButtonSelect = RadioButtonSelect as Mock;
 const mockedValidateAuthMethod = validateAuthMethodWithSettings as Mock;
-const mockedRunExitCleanup = runExitCleanup as Mock;
 const mockedClearCachedCredentialFile = clearCachedCredentialFile as Mock;
 
 describe('AuthDialog', () => {
   let props: {
-    config: Config;
     settings: LoadedSettings;
     setAuthState: (state: AuthState) => void;
     authError: string | null;
@@ -191,28 +183,7 @@ describe('AuthDialog', () => {
       );
     });
 
-    it('exits process for Login with Google when browser is suppressed', async () => {
-      const exitSpy = vi
-        .spyOn(process, 'exit')
-        .mockImplementation(() => undefined as never);
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      vi.mocked(props.config.isBrowserLaunchSuppressed).mockReturnValue(true);
-      mockedValidateAuthMethod.mockReturnValue(null);
-
-      renderWithProviders(<AuthDialog {...props} />);
-      const { onSelect: handleAuthSelect } =
-        mockedRadioButtonSelect.mock.calls[0][0];
-      await handleAuthSelect(AuthType.LOGIN_WITH_GOOGLE);
-
-      expect(mockedRunExitCleanup).toHaveBeenCalled();
-      expect(logSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Please restart Gemini CLI'),
-      );
-      expect(exitSpy).toHaveBeenCalledWith(0);
-
-      exitSpy.mockRestore();
-      logSpy.mockRestore();
-    });
+    // Test removed - browser suppression handling was removed from AuthDialog
   });
 
   it('displays authError when provided', () => {
