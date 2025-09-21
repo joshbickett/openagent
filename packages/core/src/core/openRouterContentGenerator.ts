@@ -24,7 +24,6 @@ import type {
 import { FinishReason } from '@google/genai';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 
-
 /**
  * Maps Gemini model names to OpenRouter format
  * This was mentioned in the PR but missing from implementation
@@ -42,12 +41,12 @@ function mapGeminiModelToOpenRouter(model: string): string {
     'gemini-1.5-pro': 'google/gemini-pro-1.5',
     'gemini-1.5-flash': 'google/gemini-flash-1.5',
   };
-  
+
   // If already in OpenRouter format, return as-is
   if (model.includes('/')) {
     return model;
   }
-  
+
   // Otherwise map from Gemini format
   return modelMap[model] || model;
 }
@@ -62,7 +61,7 @@ function getMaxTokensForModel(model: string): number | undefined {
   if (model.includes('grok')) {
     return undefined; // Let the model use its default
   }
-  
+
   // Conservative defaults for different model types
   if (model.includes('gemini-2.5')) return 8192;
   if (model.includes('gemini-pro')) return 8192;
@@ -76,7 +75,8 @@ export function createOpenRouterContentGenerator(
   httpOptions: { headers: Record<string, string> },
 ): ContentGenerator {
   const openRouterClient = new OpenAI({
-    baseURL: process.env['OPENROUTER_BASE_URL'] || 'https://openrouter.ai/api/v1',
+    baseURL:
+      process.env['OPENROUTER_BASE_URL'] || 'https://openrouter.ai/api/v1',
     apiKey: config.apiKey || process.env['OPENROUTER_API_KEY'],
     defaultHeaders: {
       ...httpOptions.headers,
@@ -88,95 +88,123 @@ export function createOpenRouterContentGenerator(
   async function* doGenerateContentStream(
     request: GenerateContentParameters,
   ): AsyncGenerator<GenerateContentResponse> {
+    const modelName = mapGeminiModelToOpenRouter(
+      request.model || DEFAULT_GEMINI_MODEL,
+    );
+
     try {
       const messages = convertToOpenAIFormat(request);
       const systemInstruction = extractSystemInstruction(request);
-      const modelName = mapGeminiModelToOpenRouter(request.model || DEFAULT_GEMINI_MODEL);
-      const maxTokens = request.config?.maxOutputTokens || getMaxTokensForModel(modelName);
+      const maxTokens =
+        request.config?.maxOutputTokens || getMaxTokensForModel(modelName);
 
       // Enhanced logging for debugging
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const streamParams: any = {
         model: modelName,
         messages: systemInstruction
           ? [{ role: 'system', content: systemInstruction }, ...messages]
           : messages,
         stream: true,
+        user: 'openagent-cli-user', // Required for GPT-5 and other models
       };
-      
+
       // Only add optional parameters if they're defined
       if (request.config?.temperature !== undefined) {
         streamParams.temperature = request.config.temperature;
       }
-      if (request.config?.topP !== undefined) {
+      // GPT-5 doesn't support top_p parameter
+      if (request.config?.topP !== undefined && !modelName.includes('gpt-5')) {
         streamParams.top_p = request.config.topP;
       }
       if (maxTokens !== undefined) {
         streamParams.max_tokens = maxTokens;
       }
-      const tools = convertTools(request.config?.tools);
+      const tools = convertTools(request.config?.tools, modelName);
       if (tools !== undefined) {
         streamParams.tools = tools;
       }
 
-      if (process.env['DEBUG_OPENROUTER']) {
-        console.error('OpenRouter stream request params:', JSON.stringify(streamParams, null, 2));
-        console.error('Original request contents:', JSON.stringify(request.contents, null, 2));
+      // Enhanced debug logging for GPT-5
+      if (process.env['DEBUG_OPENROUTER'] || modelName.includes('gpt-5')) {
+        console.error('=== OpenRouter Debug Info ===');
+        console.error('Model:', modelName);
+        console.error(
+          'Stream request params:',
+          JSON.stringify(streamParams, null, 2),
+        );
+        console.error(
+          'Original request contents:',
+          JSON.stringify(request.contents, null, 2),
+        );
+        console.error('=============================');
       }
 
-      const stream = await openRouterClient.chat.completions.create(streamParams as OpenAI.Chat.ChatCompletionCreateParamsStreaming);
+      const stream = await openRouterClient.chat.completions.create(
+        streamParams as OpenAI.Chat.ChatCompletionCreateParamsStreaming,
+      );
 
       let hasContent = false;
       let hasFinishReason = false;
-      
+
       for await (const chunk of stream) {
         const response = convertChunkToGeminiResponse(chunk);
         if (response.candidates && response.candidates.length > 0) {
           const candidate = response.candidates[0];
           // Check if we have actual content or finish reason
-          const hasText = candidate?.content?.parts?.some((part: Part) => 'text' in part && part.text);
-          const hasToolCall = candidate?.content?.parts?.some((part: Part) => 'functionCall' in part);
-          
+          const hasText = candidate?.content?.parts?.some(
+            (part: Part) => 'text' in part && part.text,
+          );
+          const hasToolCall = candidate?.content?.parts?.some(
+            (part: Part) => 'functionCall' in part,
+          );
+
           if (hasText || hasToolCall) {
             hasContent = true;
           }
-          
+
           if (candidate?.finishReason) {
             hasFinishReason = true;
           }
-          
+
           // Only yield if we have meaningful content
           if (hasText || hasToolCall || candidate?.finishReason) {
             yield response;
           }
         }
       }
-      
+
       // Ensure we always have a finish reason
       if (!hasFinishReason) {
         if (process.env['DEBUG_OPENROUTER']) {
           console.error('No finish reason received from model');
         }
         yield {
-          candidates: [{
-            content: {
-              role: 'model',
-              parts: hasContent ? [] : [{ text: '' }],
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: hasContent ? [] : [{ text: '' }],
+              },
+              index: 0,
+              finishReason: FinishReason.STOP,
             },
-            index: 0,
-            finishReason: FinishReason.STOP,
-          }],
+          ],
         } as unknown as GenerateContentResponse;
       }
     } catch (error) {
-      if (process.env['DEBUG_OPENROUTER']) {
-        console.error('OpenRouter stream error:', error);
+      if (process.env['DEBUG_OPENROUTER'] || modelName.includes('gpt-5')) {
+        console.error('=== OpenRouter Error ===');
+        console.error('Model:', modelName);
+        console.error('Error:', error);
         if (error instanceof OpenAI.APIError) {
-          console.error('OpenRouter API error details:', {
+          console.error('API Error Details:', {
             status: error.status,
             message: error.message,
-            error: error,
+            body: error.error,
           });
         }
+        console.error('========================');
       }
       throw convertError(error);
     }
@@ -185,34 +213,44 @@ export function createOpenRouterContentGenerator(
   const openRouterContentGenerator: ContentGenerator = {
     async generateContent(
       request: GenerateContentParameters,
-      userPromptId: string,
+      _userPromptId: string,
     ): Promise<GenerateContentResponse> {
+      const modelName = mapGeminiModelToOpenRouter(
+        request.model || DEFAULT_GEMINI_MODEL,
+      );
+
       try {
         const messages = convertToOpenAIFormat(request);
         const systemInstruction = extractSystemInstruction(request);
-        const modelName = mapGeminiModelToOpenRouter(request.model || DEFAULT_GEMINI_MODEL);
-        const maxTokens = request.config?.maxOutputTokens || getMaxTokensForModel(modelName);
+        const maxTokens =
+          request.config?.maxOutputTokens || getMaxTokensForModel(modelName);
 
         // Enhanced logging for debugging
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const completionParams: any = {
           model: modelName,
           messages: systemInstruction
             ? [{ role: 'system', content: systemInstruction }, ...messages]
             : messages,
           stream: false,
+          user: 'openagent-cli-user', // Required for GPT-5 and other models
         };
-        
+
         // Only add optional parameters if they're defined
         if (request.config?.temperature !== undefined) {
           completionParams.temperature = request.config.temperature;
         }
-        if (request.config?.topP !== undefined) {
+        // GPT-5 doesn't support top_p parameter
+        if (
+          request.config?.topP !== undefined &&
+          !modelName.includes('gpt-5')
+        ) {
           completionParams.top_p = request.config.topP;
         }
         if (maxTokens !== undefined) {
           completionParams.max_tokens = maxTokens;
         }
-        const tools = convertTools(request.config?.tools);
+        const tools = convertTools(request.config?.tools, modelName);
         if (tools !== undefined) {
           completionParams.tools = tools;
         }
@@ -220,26 +258,41 @@ export function createOpenRouterContentGenerator(
           completionParams.response_format = { type: 'json_object' };
         }
 
-        if (process.env['DEBUG_OPENROUTER']) {
-          console.error('OpenRouter non-stream request params:', JSON.stringify(completionParams, null, 2));
-          console.error('Original request contents:', JSON.stringify(request.contents, null, 2));
+        // Enhanced debug logging for GPT-5
+        if (process.env['DEBUG_OPENROUTER'] || modelName.includes('gpt-5')) {
+          console.error('=== OpenRouter Debug Info (non-stream) ===');
+          console.error('Model:', modelName);
+          console.error(
+            'Request params:',
+            JSON.stringify(completionParams, null, 2),
+          );
+          console.error(
+            'Original request contents:',
+            JSON.stringify(request.contents, null, 2),
+          );
+          console.error('==========================================');
         }
 
-        const completion = await openRouterClient.chat.completions.create(completionParams as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming);
+        const completion = await openRouterClient.chat.completions.create(
+          completionParams as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming,
+        );
 
         return convertToGeminiResponse(
           completion as OpenAI.Chat.ChatCompletion,
         );
       } catch (error) {
-        if (process.env['DEBUG_OPENROUTER']) {
-          console.error('OpenRouter non-stream error:', error);
+        if (process.env['DEBUG_OPENROUTER'] || modelName.includes('gpt-5')) {
+          console.error('=== OpenRouter Error (non-stream) ===');
+          console.error('Model:', modelName);
+          console.error('Error:', error);
           if (error instanceof OpenAI.APIError) {
-            console.error('OpenRouter API error details:', {
+            console.error('API Error Details:', {
               status: error.status,
               message: error.message,
-              error: error,
+              body: error.error,
             });
           }
+          console.error('=====================================');
         }
         throw convertError(error);
       }
@@ -247,7 +300,7 @@ export function createOpenRouterContentGenerator(
 
     async generateContentStream(
       request: GenerateContentParameters,
-      userPromptId: string,
+      _userPromptId: string,
     ): Promise<AsyncGenerator<GenerateContentResponse>> {
       return doGenerateContentStream(request);
     },
@@ -420,28 +473,61 @@ import type { ToolListUnion, Tool as GenaiTool } from '@google/genai';
 
 function convertTools(
   tools?: ToolListUnion,
+  modelName?: string,
 ): OpenAI.Chat.ChatCompletionTool[] | undefined {
   if (!tools) return undefined;
-  
+
   // Normalize tools to array
   const toolsArray = Array.isArray(tools) ? tools : [tools];
   if (toolsArray.length === 0) return undefined;
-  
+
   // Get the first tool (usually only one tool object with function declarations)
   const firstTool = toolsArray[0];
   if (!firstTool || typeof firstTool === 'string') return undefined;
-  
+
   const functionDeclarations = (firstTool as GenaiTool).functionDeclarations;
   if (!functionDeclarations) return undefined;
 
-  return functionDeclarations.map((func) => ({
-    type: 'function' as const,
-    function: {
-      name: func.name || '',
-      description: func.description || '',
-      parameters: func.parameters as any,
-    },
-  }));
+  return functionDeclarations.map((func) => {
+    // Ensure parameters has valid JSON Schema structure
+    const parameters = func.parameters || {};
+
+    // Convert to plain JSON Schema format for OpenRouter
+    // The Gemini SDK uses Type enum, but OpenRouter expects standard JSON Schema
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const jsonSchemaParams: any = {
+      type: 'object',
+      properties: parameters.properties || {},
+    };
+
+    if (parameters.required) {
+      jsonSchemaParams.required = parameters.required;
+    }
+
+    // Debug logging for problematic tools
+    if (
+      (func.name === 'list_directory' || process.env['DEBUG_OPENROUTER']) &&
+      modelName?.includes('gpt-5')
+    ) {
+      console.error(
+        `${func.name} parameters:`,
+        JSON.stringify(func.parameters, null, 2),
+      );
+      console.error(
+        `${func.name} converted:`,
+        JSON.stringify(jsonSchemaParams, null, 2),
+      );
+    }
+
+    return {
+      type: 'function' as const,
+      function: {
+        name: func.name || '',
+        description: func.description || '',
+        parameters: jsonSchemaParams,
+      },
+    };
+  });
 }
 
 function convertChunkToGeminiResponse(
@@ -466,7 +552,7 @@ function convertChunkToGeminiResponse(
       if (toolCall.function?.name) {
         // Only include complete function calls
         try {
-          const args = toolCall.function.arguments 
+          const args = toolCall.function.arguments
             ? JSON.parse(toolCall.function.arguments)
             : {};
           parts.push({
@@ -523,11 +609,11 @@ function convertToGeminiResponse(
   }
 
   const parts: Part[] = [];
-  
+
   if (choice.message.content) {
     parts.push({ text: choice.message.content });
   }
-  
+
   if (choice.message.tool_calls) {
     for (const toolCall of choice.message.tool_calls) {
       parts.push({
@@ -565,7 +651,7 @@ function convertToGeminiResponse(
 
 function mapFinishReason(reason: string | null): FinishReason | undefined {
   if (!reason) return undefined;
-  
+
   switch (reason) {
     case 'stop':
       return FinishReason.STOP;
@@ -581,15 +667,17 @@ function mapFinishReason(reason: string | null): FinishReason | undefined {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function convertError(error: any): Error {
   if (error instanceof OpenAI.APIError) {
     let errorMessage = `OpenRouter API error (${error.status}): ${error.message}`;
-    
+
     // Add specific guidance for common errors
     if (error.status === 422) {
-      errorMessage += '\nThis usually indicates the model doesn\'t support one of the parameters sent (e.g., tools, stream_options, or specific max_tokens values).';
+      errorMessage +=
+        "\nThis usually indicates the model doesn't support one of the parameters sent (e.g., tools, stream_options, or specific max_tokens values).";
     }
-    
+
     return new Error(errorMessage);
   }
   return error instanceof Error ? error : new Error(String(error));
