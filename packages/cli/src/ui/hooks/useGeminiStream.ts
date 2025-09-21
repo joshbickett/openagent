@@ -67,6 +67,7 @@ enum StreamProcessingStatus {
   Completed,
   UserCancelled,
   Error,
+  HasPendingTools,
 }
 
 const EDIT_TOOL_NAMES = new Set(['replace', 'write_file']);
@@ -725,7 +726,10 @@ export const useGeminiStream = (
         }
       }
       if (toolCallRequests.length > 0) {
+        // Keep isResponding true while scheduling tool calls to prevent user input
         scheduleToolCalls(toolCallRequests, signal);
+        // Note: isResponding will be set to false by handleCompletedTools after tool responses are submitted
+        return StreamProcessingStatus.HasPendingTools;
       }
       return StreamProcessingStatus.Completed;
     },
@@ -813,6 +817,13 @@ export const useGeminiStream = (
             loopDetectedRef.current = false;
             handleLoopDetectedEvent();
           }
+
+          // Only set isResponding to false if there are no pending tools
+          // If there are pending tools, handleCompletedTools will set it to false
+          // after the tool responses are submitted
+          if (processingStatus !== StreamProcessingStatus.HasPendingTools) {
+            setIsResponding(false);
+          }
         } catch (error: unknown) {
           if (error instanceof UnauthorizedError) {
             onAuthError('Session expired or is unauthorized.');
@@ -831,7 +842,6 @@ export const useGeminiStream = (
               userMessageTimestamp,
             );
           }
-        } finally {
           setIsResponding(false);
         }
       });
